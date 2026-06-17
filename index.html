@@ -13,61 +13,49 @@ body{
     gap: 20px;
 }
 
-/* LEFT PANEL */
 #sidebar{
-    width: 280px;
+    width: 260px;
 }
 
-.sidebar-section{
-    margin-bottom: 20px;
-}
-
-select, button{
-    width: 100%;
-    padding: 8px;
-    margin-top: 5px;
-}
-
-/* MAP AREA */
 #map-container{
     position: relative;
     border: 1px solid #ccc;
     display: inline-block;
-    flex: 1;
-    overflow: auto;
 }
 
-#map-image{
+#map-container img{
     display: block;
     max-width: 100%;
 }
 
-/* BIN DOTS */
 .bin{
     position: absolute;
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     transform: translate(-50%, -50%);
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    color: white;
+    user-select: none;
 }
 
-.Soap{ background: #f39c12; }
-.Edibles{ background: #27ae60; }
-.Warehouse{ background: #2980b9; }
-.Admin{ background: #8e44ad; }
-.Other{ background: #7f8c8d; }
+.P{
+    background: #1565C0; /* Plastic - Blue */
+}
 
-.summary-table{
+.C{
+    background: #E65100; /* Cardboard - Orange */
+}
+
+button, select{
     width: 100%;
-    border-collapse: collapse;
-}
-
-.summary-table th,
-.summary-table td{
-    border: 1px solid #ccc;
-    padding: 4px;
-    font-size: 12px;
+    padding: 6px;
+    margin-top: 6px;
 }
 </style>
 </head>
@@ -77,111 +65,89 @@ select, button{
 <!-- SIDEBAR -->
 <div id="sidebar">
 
-    <div class="sidebar-section">
-        <h4>Load Layout Map</h4>
-        <input type="file" id="mapUpload" accept="image/*">
-        <p style="font-size:12px;color:#666;">
-            Or place file in: assets/maps/layout.png
-        </p>
-    </div>
+    <h3>Bin Tool</h3>
 
-    <div class="sidebar-section">
-        <h4>Next Bin Type</h4>
-        <select id="next-dept">
-            <option value="Soap">Soap / Detergent</option>
-            <option value="Edibles">Edibles</option>
-            <option value="Warehouse">Warehouse</option>
-            <option value="Admin">Admin / Kitchen</option>
-            <option value="Other">Other</option>
-        </select>
-    </div>
+    <select id="mode">
+        <option value="P">Plastic Bin (P)</option>
+        <option value="C">Cardboard Bin (C)</option>
+        <option value="DELETE">Delete Mode</option>
+    </select>
 
-    <div class="sidebar-section">
-        <h4>Summary</h4>
-        <table class="summary-table">
-            <thead>
-                <tr><th>Dept</th><th>Count</th></tr>
-            </thead>
-            <tbody id="summary-body"></tbody>
-        </table>
-    </div>
+    <button onclick="clearAll()">Clear All</button>
+
+    <p style="font-size:12px;color:#666;">
+        Map: assets/maps/layout.png
+    </p>
 
 </div>
 
 <!-- MAP -->
 <div id="map-container">
-    <img id="map-image">
+    <img id="map" src="assets/maps/layout.png" alt="Layout Map">
 </div>
 
 <script>
-// ─── LAYOUT MAP (NO EMBEDDED IMAGES) ────────────────────────────────
-const MAPS = {
-    layout: "assets/maps/layout.png"
-};
+const container = document.getElementById("map-container");
+const map = document.getElementById("map");
+const modeSelect = document.getElementById("mode");
 
-const mapImage = document.getElementById("map-image");
-const mapContainer = document.getElementById("map-container");
-const mapUpload = document.getElementById("mapUpload");
+let bins = [];
 
-// Load default layout
-mapImage.src = MAPS.layout;
+/* PLACE BIN */
+container.addEventListener("click", (e) => {
 
-// Optional upload override
-mapUpload.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    if(!map.src) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        mapImage.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
-});
+    const mode = modeSelect.value;
+    if(mode === "DELETE") return;
 
-// Place bins on click
-mapContainer.addEventListener("click", (e) => {
-    if (!mapImage.src) return;
-
-    const rect = mapContainer.getBoundingClientRect();
+    const rect = container.getBoundingClientRect();
 
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const type = document.getElementById("next-dept").value;
+    const bin = {
+        id: Date.now(),
+        type: mode,
+        x,
+        y
+    };
 
-    const bin = document.createElement("div");
-    bin.classList.add("bin", type);
-
-    bin.style.left = x + "px";
-    bin.style.top = y + "px";
-
-    // remove bin on double click
-    bin.addEventListener("dblclick", () => {
-        bin.remove();
-    });
-
-    mapContainer.appendChild(bin);
-
-    updateSummary();
+    bins.push(bin);
+    renderBins();
 });
 
-// Summary updater
-function updateSummary(){
-    const counts = {};
+/* RENDER BINS */
+function renderBins(){
 
-    document.querySelectorAll(".bin").forEach(bin => {
-        const type = bin.classList[1];
-        counts[type] = (counts[type] || 0) + 1;
+    document.querySelectorAll(".bin").forEach(b => b.remove());
+
+    bins.forEach(b => {
+        const el = document.createElement("div");
+
+        el.classList.add("bin", b.type);
+        el.style.left = b.x + "px";
+        el.style.top = b.y + "px";
+
+        el.textContent = b.type;
+
+        el.addEventListener("click", (e) => {
+            e.stopPropagation();
+
+            if(modeSelect.value === "DELETE"){
+                bins = bins.filter(x => x.id !== b.id);
+                renderBins();
+            }
+        });
+
+        container.appendChild(el);
     });
+}
 
-    const tbody = document.getElementById("summary-body");
-    tbody.innerHTML = "";
-
-    Object.keys(counts).forEach(key => {
-        const row = document.createElement("tr");
-        row.innerHTML = `<td>${key}</td><td>${counts[key]}</td>`;
-        tbody.appendChild(row);
-    });
+/* CLEAR ALL */
+function clearAll(){
+    bins = [];
+    renderBins();
 }
 </script>
 
